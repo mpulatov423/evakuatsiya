@@ -1,0 +1,10 @@
+{
+  "name": "Evakuatsiya yordamchisi",
+  "short_name": "Evakuatsiya",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f8",
+  "theme_color": "#0d1b2a",
+  "description": "Bino evakuatsiya xaritasi va favqulodda sirena yordamchisi",
+  "lang": "uz"
+}

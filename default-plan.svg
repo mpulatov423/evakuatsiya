@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470">
+  <rect width="800" height="470" fill="#eef5f1"/>
+  <g fill="#fff" stroke="#a9c4bb" stroke-width="3">
+    <rect x="34" y="34" width="170" height="130" rx="5"/>
+    <rect x="218" y="34" width="180" height="130" rx="5"/>
+    <rect x="412" y="34" width="170" height="130" rx="5"/>
+    <rect x="596" y="34" width="170" height="130" rx="5"/>
+    <rect x="34" y="187" width="170" height="110" rx="5"/>
+    <rect x="218" y="187" width="180" height="110" rx="5"/>
+    <rect x="412" y="187" width="170" height="110" rx="5"/>
+    <rect x="596" y="187" width="170" height="110" rx="5"/>
+    <rect x="34" y="321" width="170" height="112" rx="5"/>
+    <rect x="218" y="321" width="180" height="112" rx="5"/>
+    <rect x="412" y="321" width="170" height="112" rx="5"/>
+    <rect x="596" y="321" width="170" height="112" rx="5"/>
+  </g>
+  <g fill="#dcece6" stroke="#89b0a3" stroke-width="3">
+    <rect x="204" y="77" width="14" height="58"/><rect x="398" y="77" width="14" height="58"/><rect x="582" y="77" width="14" height="58"/>
+    <rect x="204" y="211" width="14" height="58"/><rect x="398" y="211" width="14" height="58"/><rect x="582" y="211" width="14" height="58"/>
+    <rect x="204" y="348" width="14" height="58"/><rect x="398" y="348" width="14" height="58"/><rect x="582" y="348" width="14" height="58"/>
+  </g>
+  <g fill="#8aa39c" font-family="Arial, sans-serif" font-size="15" text-anchor="middle">
+    <text x="119" y="104">Ofis 101</text><text x="308" y="104">Ofis 102</text><text x="497" y="104">Ofis 103</text><text x="681" y="104">Zinapoya A</text>
+    <text x="119" y="252">Ofis 104</text><text x="308" y="252">Majlis xonasi</text><text x="497" y="252">Ofis 105</text><text x="681" y="252">Yo‘lak</text>
+    <text x="119" y="385">Qabulxona</text><text x="308" y="385">Kutish joyi</text><text x="497" y="385">Xizmat xonasi</text><text x="681" y="385">Asosiy chiqish</text>
+  </g>
+  <g fill="#efb34c"><path d="M72 302h30l-15 19z"/><path d="M742 302h-30l15 19z"/></g>
+  <g fill="#e6f5ed" stroke="#26a672" stroke-width="3"><path d="M720 34h46v46h-46z"/><path d="M720 390h46v43h-46z"/></g>
+  <g fill="#239565" font-family="Arial, sans-serif" font-weight="700" font-size="13" text-anchor="middle"><text x="743" y="62">EXIT</text><text x="743" y="417">EXIT</text></g>
+</svg>

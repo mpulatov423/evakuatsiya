@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1b2a" />
+    <meta name="description" content="Bino evakuatsiyasi uchun xarita va sirena yordamchisi" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="styles.css?v=3" />
+    <title>Evakuatsiya</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar setup-topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">↗</div>
+          <div><p class="eyebrow">Favqulodda yordamchi</p><h1 id="pageTitle">Evakuatsiya</h1></div>
+        </div>
+        <button class="icon-button hidden" id="settingsButton" aria-label="Sozlamalar">⚙</button>
+      </header>
+
+      <main>
+        <section class="app-view active" id="view-setup">
+          <div class="first-setup-heading"><p class="eyebrow">Birinchi sozlash</p><h2>Binoni ilovaga kiriting</h2><p class="muted">Davom etish uchun evakuatsiya xaritasi va sirena ovozini yuklang.</p></div>
+          <div class="first-upload-grid">
+            <label class="first-upload-card" for="mapInput"><span class="upload-icon">▧</span><strong>Xarita yuklash</strong><small>PNG, JPG yoki SVG</small><span class="upload-state" id="mapUploadState">Kutilmoqda</span><input type="file" id="mapInput" accept="image/png,image/jpeg,image/svg+xml" /></label>
+            <label class="first-upload-card" for="audioInput"><span class="upload-icon">♫</span><strong>Audio yuklash</strong><small>MP3, WAV yoki M4A</small><span class="upload-state" id="audioUploadState">Kutilmoqda</span><input type="file" id="audioInput" accept="audio/*" /></label>
+          </div>
+        </section>
+
+        <section class="app-view" id="view-map">
+          <div class="view-heading"><div><p class="eyebrow">Evakuatsiya xaritasi</p><h2>Chiqish yo‘li</h2></div><select id="floorSelect" class="floor-select" aria-label="Qavatni tanlang"><option value="1">1-qavat</option><option value="2">2-qavat</option><option value="3">3-qavat</option></select></div>
+          <div class="map-card" id="mapCard"><img id="floorPlan" src="" alt="Yuklangan bino evakuatsiya xaritasi" /><svg class="route-layer" viewBox="0 0 800 470" preserveAspectRatio="none" aria-hidden="true"><polyline id="routeLine" points="145,345 230,345 230,260 365,260 365,150 515,150 515,90 690,90" /><circle class="route-pulse" cx="145" cy="345" r="13" /><circle class="exit-point" cx="690" cy="90" r="10" /></svg><div class="map-label current-label">Siz shu yerdasiz</div><div class="map-label exit-label">Chiqish</div></div>
+          <div class="map-waiting" id="mapWaiting"><span>⌖</span><strong>Sirena kutilmoqda</strong><small>Signal aniqlanganda sizning joylashuvingiz va chiqish yo‘li ko‘rsatiladi.</small></div>
+          <div class="map-legend"><span><i class="legend-dot blue"></i> Sizning joylashuvingiz</span><span><i class="legend-line"></i> Chiqish yo‘li</span><span><i class="legend-dot green"></i> Favqulodda chiqish</span></div>
+          <div class="route-summary"><div class="route-stat"><strong id="distanceValue">—</strong><span>Chiqishgacha</span></div><div class="route-stat"><strong id="timeValue">—</strong><span>Taxminiy vaqt</span></div><div class="route-stat"><strong>—</strong><span>Yo‘nalish</span></div></div>
+          <div class="map-actions"><button class="emergency-button" id="testAlarmButton"><span class="alarm-icon">◉</span><span><strong>Sirena testini tekshirish</strong><small>Yo‘nalish qanday chiqishini ko‘ring</small></span><span class="button-arrow">→</span></button><button class="secondary-button full-button" id="monitorButton">◌ Sirenani kuzatishni boshlash</button><button class="secondary-button full-button" id="mapLocationButton">⌖ Joylashuvga ruxsat berish</button></div>
+        </section>
+
+        <section class="app-view" id="view-recorder">
+          <div class="view-heading simple-heading"><div><p class="eyebrow">Sirena ovozi</p><h2>Diktafon</h2><p class="muted">Ovoz faylini almashtiring yoki sirenani qayta yozing.</p></div></div>
+          <div class="recorder-hero"><div class="sound-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><strong id="recorderTitle">Sirena ovozi tayyor</strong><small id="recordingStatus">Favqulodda signal shu audio orqali ijro etiladi</small></div>
+          <label class="large-upload-card" for="recorderAudioInput"><span class="upload-icon">♫</span><strong>Boshqa audio yuklash</strong><small>MP3, WAV yoki M4A</small><input type="file" id="recorderAudioInput" accept="audio/*" /></label>
+          <div class="or-divider"><span>yoki</span></div>
+          <div class="recorder-card big-recorder-card"><div class="recorder-copy"><span class="mic-icon">●</span><div><strong>Diktofon bilan yozish</strong><small>Sirena ovozini 5–10 soniya yozing</small></div></div><button class="record-button" id="recordButton" aria-label="Yozishni boshlash"><span></span></button></div>
+          <div class="audio-preview hidden" id="audioPreview"><p class="eyebrow">Tanlangan audio</p><div id="audioFileStatus"></div></div>
+        </section>
+
+        <section class="app-view" id="view-settings">
+          <div class="view-heading simple-heading"><div><p class="eyebrow">Ilova</p><h2>Sozlamalar</h2><p class="muted">Xarita va signal fayllarini almashtirish.</p></div></div>
+          <div class="settings-file-card"><div><span class="settings-file-icon">▧</span><div><strong>Evakuatsiya xaritasi</strong><small id="settingsMapStatus">Yuklangan</small></div></div><button class="small-outline-button" id="settingsMapButton">Almashtirish</button></div>
+          <div class="settings-file-card"><div><span class="settings-file-icon">♫</span><div><strong>Sirena audiosi</strong><small id="settingsAudioStatus">Yuklangan</small></div></div><button class="small-outline-button" id="settingsAudioButton">Almashtirish</button></div>
+          <input class="hidden" type="file" id="settingsMapInput" accept="image/png,image/jpeg,image/svg+xml" /><input class="hidden" type="file" id="settingsAudioInput" accept="audio/*" />
+          <div class="permissions-card"><div class="permission-header"><div><p class="eyebrow">Ruxsatlar</p><h2>Telefon tayyorligi</h2></div><span class="ready-badge">Kerak</span></div><div class="permission-list"><div class="permission-row"><span class="permission-check done">✓</span><span>Mikrofon</span><small>Kuzatuv uchun</small></div><div class="permission-row"><span class="permission-check pending">!</span><span>Joylashuv</span><button id="permissionLocation">Ruxsat berish</button></div></div></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav hidden" id="bottomNav" aria-label="Asosiy navigatsiya"><button class="nav-item active" data-view="map"><span>▧</span><small>Xarita</small></button><button class="nav-item" data-view="recorder"><span>●</span><small>Diktafon</small></button><button class="nav-item" data-view="settings"><span>⚙</span><small>Sozlamalar</small></button></nav>
+    </div>
+
+    <div class="modal-backdrop hidden" id="alarmModal" role="dialog" aria-modal="true" aria-labelledby="alarmTitle"><div class="alarm-modal"><div class="alarm-ring"><span>!</span></div><p class="eyebrow">Favqulodda signal</p><h2 id="alarmTitle">Evakuatsiya boshlansin</h2><p>Sirena aniqlandi. Yashil chiziq bo‘yicha eng yaqin chiqishga boring.</p><div class="alarm-details"><strong>34 metr</strong><span>Chiqishgacha · Yo‘nalish xaritada ko‘rsatildi</span></div><div class="modal-actions"><button class="primary-button" id="openMapButton">Xaritani ko‘rsatish</button><button class="text-button" id="closeAlarmButton">Yopish</button></div></div></div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js?v=3"></script>
+  </body>
+</html>

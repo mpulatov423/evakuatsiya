@@ -20,6 +20,10 @@ Keyin `http://localhost:5500` manzilini oching.
 
 Mikrofon kuzatuvi hozir baland ovoz darajasiga asoslangan demo algoritmdir. Haqiqiy mahsulotda sirena fingerprint/audio-classification modeli, Android foreground service, doimiy notification, battery-optimization sozlamalari va indoor positioning (QR/BLE/Wi-Fi) qo‘shilishi kerak.
 
+## Vercel
+
+`package.json` ichidagi `build` skript frontend fayllarini `public` papkasiga chiqaradi. Vercel’da Framework Preset `Other`, Build Command `npm run build`, Output Directory `public` qilib deploy qiling.
+
 ## APK yo‘li
 
 Keyingi bosqichda bu frontend Capacitor yoki native Android shell ichiga joylanadi. So‘ng Android Studio orqali debug/release APK olinadi. Flutter kompyuterda o‘rnatilmaganligi sababli prototip hozir brauzerda ishlaydigan, keyinchalik APK’ga o‘raladigan formatda tayyorlandi.

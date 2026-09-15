@@ -5,7 +5,7 @@
   "description": "Evakuatsiya xaritasi va sirena yordamchisi prototipi",
   "scripts": {
     "build": "node build.js",
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node local-server.js",
+    "dev": "node local-server.js"
   }
 }

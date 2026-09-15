@@ -1,5 +1,5 @@
-const CACHE_NAME = 'evakuatsiya-prototype-v3';
-const APP_FILES = ['./', './index.html', './styles.css', './app.js', './default-plan.svg', './manifest.json'];
+const CACHE_NAME = 'evakuatsiya-prototype-v16';
+const APP_FILES = ['./', './index.html', './styles.css?v=18', './client.js?v=18', './favicon.svg', './manifest.json'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

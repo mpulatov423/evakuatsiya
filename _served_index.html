@@ -32,8 +32,12 @@
           <div class="mode-tabs"><button class="mode-tab active" data-mode="start"><i class="blue-dot"></i> Siz turgan joy</button><button class="mode-tab" data-mode="exit"><i class="green-dot"></i> Chiqish</button><button class="mode-tab" data-mode="path"><i class="line-dot"></i> Yo‘l nuqtasi</button></div>
           <div class="floor-editor" id="floorEditor"><img id="floorPlan" src="" alt="Yuklangan evakuatsiya xaritasi" /><svg id="routeSvg" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline id="routePolyline" points="" /><circle id="startMarker" cx="0" cy="0" r="2.2" /><circle id="exitMarker" cx="0" cy="0" r="2.2" /></svg><span class="editor-label start-label hidden" id="startLabel">Siz</span><span class="editor-label exit-label hidden" id="exitLabel">Chiqish</span><div class="editor-empty" id="editorEmpty">Xarita yuklanmoqda...</div></div>
           <div class="point-status"><div><i class="blue-dot"></i><span id="startStatus">Siz turgan joy belgilanmagan</span></div><div><i class="green-dot"></i><span id="exitStatus">Chiqish belgilanmagan</span></div></div>
-          <div class="location-card"><div class="location-icon">⌖</div><div class="location-copy"><strong>GPS kalibrlash</strong><small id="locationStatus">"Siz turgan joy" ni belgilang, GPS avtomatik olinadi</small></div></div>
-          <div style="margin-top:10px; font-size:12px; color:var(--muted);" id="anchorStatus">GPS: Kalibrlash kutilmoqda...</div>
+          <div class="location-card"><div class="location-icon">⌖</div><div class="location-copy"><strong>Google Maps lokatsiyasi</strong><small id="locationStatus">Telefon lokatsiyasi olinmagan</small></div><button class="small-button" id="getLocationButton">Olish</button></div>
+          <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+            <button class="small-button" id="addAnchorButton">GPS anchor qo'shish</button>
+            <button class="small-button" id="computeTransformButton">Kalibrlashni hisobla</button>
+            <div style="flex:1; font-size:12px; color:var(--muted);" id="anchorList">Anchorlar: 0</div>
+          </div>
           <div class="google-preview hidden" id="googlePreview"><iframe id="googleFrame" title="Google Maps bino lokatsiyasi" loading="lazy"></iframe><a id="googleLink" target="_blank" rel="noopener">Google Maps’da ochish ↗</a></div>
         </section>
 

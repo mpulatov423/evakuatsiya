@@ -6,6 +6,8 @@ const state = {
   mapUrl: '',
   audioUrl: '',
   audioName: '',
+  anchors: [],
+  transform: null,
   location: null,
   mode: 'start',
   start: null,
@@ -18,7 +20,14 @@ const state = {
   noiseFloor: 0,
   demoMode: false,
   gpsAnchor: null,
-  lastStableGps: null
+  lastStableGps: null,
+  smoothedPosition: null, // For GPS smoothing
+  lastGpsUpdate: 0,
+  // Sensor-based indoor tracking
+  sensorPosition: null,
+  lastAcceleration: null,
+  lastHeading: null,
+  sensorEnabled: false
 };
 
 let recorder;
@@ -31,6 +40,9 @@ let alarmAudio;
 let toastTimer;
 let locationWatch;
 let frequencyData;
+let sensorWatch;
+let accelerationWatch;
+let orientationWatch;
 let referenceProfile;
 let referenceSequence = [];
 let liveSequence = [];
@@ -141,8 +153,77 @@ function updateUploadState() {
   $('#mapUploadCard').classList.toggle('uploaded', Boolean(state.mapUrl));
   $('#audioUploadCard').classList.toggle('uploaded', Boolean(state.audioUrl));
   if (state.mapUrl && state.audioUrl) {
+    // Prepare and auto-apply a basic route so monitoring can start without buttons
     prepareCalibration();
-    switchScreen('calibration');
+    // If start/exit not set, set sensible defaults (center/start and top exit)
+    if (!state.start) state.start = { x: 50, y: 70 };
+    if (!state.exit) state.exit = { x: 50, y: 12 };
+    state.path = state.path || [];
+    // mark configured and start monitoring
+    try { saveRoute(); } catch (e) { console.error(e); }
+  }
+  // Save to localStorage
+  saveState();
+}
+
+function saveState() {
+  const stateToSave = {
+    mapUrl: state.mapUrl,
+    audioUrl: state.audioUrl,
+    audioName: state.audioName,
+    start: state.start,
+    exit: state.exit,
+    path: state.path,
+    anchors: state.anchors,
+    transform: state.transform,
+    configured: state.configured
+  };
+  localStorage.setItem('evakuatsiyaState', JSON.stringify(stateToSave));
+}
+
+function loadState() {
+  const saved = localStorage.getItem('evakuatsiyaState');
+  if (!saved) return false;
+  try {
+    const parsed = JSON.parse(saved);
+    state.mapUrl = parsed.mapUrl || '';
+    state.audioUrl = parsed.audioUrl || '';
+    state.audioName = parsed.audioName || '';
+    state.start = parsed.start || null;
+    state.exit = parsed.exit || null;
+    state.path = parsed.path || [];
+    state.anchors = parsed.anchors || [];
+    state.transform = parsed.transform || null;
+    state.configured = parsed.configured || false;
+
+    // Restore UI
+    if (state.mapUrl) {
+      $('#floorPlan').src = state.mapUrl;
+      $('#livePlan').src = state.mapUrl;
+      $('#editorEmpty').classList.add('hidden');
+    }
+    if (state.start && state.exit) {
+      updateMarkers();
+      $('#livePolyline').setAttribute('points', [state.start, ...state.path, state.exit].map(pointString).join(' '));
+      $('#liveStartMarker').setAttribute('cx', state.start.x);
+      $('#liveStartMarker').setAttribute('cy', state.start.y);
+      $('#liveExitMarker').setAttribute('cx', state.exit.x);
+      $('#liveExitMarker').setAttribute('cy', state.exit.y);
+      $('#liveStartLabel').style.left = `${state.start.x}%`;
+      $('#liveStartLabel').style.top = `${state.start.y}%`;
+      $('#liveExitLabel').style.left = `${state.exit.x}%`;
+      $('#liveExitLabel').style.top = `${state.exit.y}%`;
+      $('#liveStartLabel').classList.remove('hidden');
+      $('#liveExitLabel').classList.remove('hidden');
+    }
+    if (state.anchors.length > 0) {
+      renderAnchors();
+    }
+    updateUploadState();
+    return true;
+  } catch (e) {
+    console.error('Failed to load state:', e);
+    return false;
   }
 }
 
@@ -217,10 +298,25 @@ function updateMarkers() {
 
 function handleFloorClick(event) {
   const point = pointFromClick(event, $('#floorEditor'));
-  if (state.mode === 'start') state.start = point;
+  if (state.mode === 'anchor') { addAnchorPending(point); return; }
+  if (state.mode === 'start') {
+    state.start = point;
+    // Auto-get GPS when setting start point for calibration
+    showToast('Siz turgan joy belgilandi. GPS olinmoqda...');
+    navigator.geolocation.getCurrentPosition((position) => {
+      state.anchors.push({ x: point.x, y: point.y, lat: position.coords.latitude, lon: position.coords.longitude });
+      state.gpsAnchor = { latitude: position.coords.latitude, longitude: position.coords.longitude, x: point.x, y: point.y };
+      renderAnchors();
+      computeTransformFromAnchors();
+      updateGoogleLocation();
+      saveState();
+      showToast('GPS kalibrlash tayyor! Endi harakat qiling.');
+    }, () => showToast('GPS ruxsati berilmadi'), { enableHighAccuracy: true, timeout: 10000 });
+  }
   if (state.mode === 'exit') state.exit = point;
   if (state.mode === 'path' && state.start && state.exit) state.path.push(point);
   updateMarkers();
+  saveState();
 }
 
 function updateGoogleLocation() {
@@ -237,12 +333,74 @@ function updateGoogleLocation() {
   $('#locationValue').textContent = 'OK';
 }
 
+// --- Anchor calibration utilities ---
+let anchorPending = null;
+
+function renderAnchors() {
+  const status = $('#anchorStatus');
+  if (!status) return;
+  status.textContent = state.anchors.length >= 1 
+    ? `GPS: Kalibrlash tayyor ✓`
+    : `GPS: Kalibrlash kutilmoqda...`;
+}
+
+function addAnchorPending(point) {
+  anchorPending = point;
+  showToast('Nuqta tanlandi. GPS olinmoqda...');
+  // Auto-get GPS location
+  getLocation();
+}
+
+function latLonToMeters(lat, lon, refLat) {
+  const latMeters = (lat - refLat) * 111320;
+  const lonMeters = lon * 111320 * Math.cos((refLat * Math.PI) / 180);
+  return { x: lonMeters, y: latMeters };
+}
+
+function computeTransformFromAnchors() {
+  if (!state.anchors || state.anchors.length < 1) { showToast('Kamida 1 ta anchor kerak'); return; }
+  // Simple single-anchor calibration: just store the reference point
+  const anchor = state.anchors[0];
+  state.transform = { 
+    anchorX: anchor.x, 
+    anchorY: anchor.y, 
+    anchorLat: anchor.lat, 
+    anchorLon: anchor.lon,
+    refLat: anchor.lat,
+    // Smaller scale for better indoor sensitivity (20m width, 15m height)
+    scaleX: 20, 
+    scaleY: 15 
+  };
+  showToast('Kalibrlash yaratildi. Endi harakat qiling.');
+}
+
+function applyTransformToLatLon(lat, lon) {
+  if (!state.transform) return null;
+  const { anchorX, anchorY, anchorLat, anchorLon, scaleX, scaleY } = state.transform;
+  // Calculate meters difference from anchor
+  const latMeters = (lat - anchorLat) * 111320;
+  const lonMeters = (lon - anchorLon) * 111320 * Math.cos((anchorLat * Math.PI) / 180);
+  // Convert to percentage on map
+  const x = anchorX + (lonMeters / scaleX) * 100;
+  const y = anchorY - (latMeters / scaleY) * 100; // minus because latitude increases northward
+  return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+}
+
 function getLocation() {
   if (!navigator.geolocation) return showToast('Bu qurilmada lokatsiya mavjud emas');
   navigator.geolocation.getCurrentPosition((position) => {
     state.location = position.coords;
     updateGoogleLocation();
     showToast('Google Maps lokatsiyasi olindi');
+    // If an anchor point was pending (user clicked image first), attach anchor
+    if (state.mode === 'anchor' && anchorPending) {
+      state.anchors.push({ x: anchorPending.x, y: anchorPending.y, lat: position.coords.latitude, lon: position.coords.longitude });
+      anchorPending = null;
+      state.mode = 'start';
+      renderAnchors();
+      // Auto-compute transform with just 1 anchor
+      computeTransformFromAnchors();
+    }
   }, () => showToast('Lokatsiya ruxsati berilmadi'), { enableHighAccuracy: true, timeout: 10000 });
 }
 
@@ -268,14 +426,143 @@ function stopLocationWatch() {
   locationWatch = undefined;
 }
 
-function updatePlanPositionFromGps(coords) {
-  if (!state.start || !state.exit || !state.gpsAnchor) return;
-  if (coords.accuracy && coords.accuracy > 35) return;
-  if (state.lastStableGps) {
-    const latMeters = (coords.latitude - state.lastStableGps.latitude) * 111320;
-    const lonMeters = (coords.longitude - state.lastStableGps.longitude) * 111320 * Math.cos((state.lastStableGps.latitude * Math.PI) / 180);
-    if (Math.sqrt((latMeters * latMeters) + (lonMeters * lonMeters)) < 5) return;
+// --- Sensor-based indoor tracking ---
+async function startSensorTracking() {
+  if (!window.DeviceOrientationEvent || !window.DeviceMotionEvent) {
+    showToast('Bu qurilmada sensorlar mavjud emas. GPS ishlatiladi.');
+    return false;
   }
+
+  // iOS 13+ requires permission request
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const permission = await DeviceOrientationEvent.requestPermission();
+      if (permission !== 'granted') {
+        showToast('Sensor ruxsati berilmadi. GPS ishlatiladi.');
+        return false;
+      }
+    } catch (error) {
+      showToast('Sensor ruxsati olishda xatolik. GPS ishlatiladi.');
+      return false;
+    }
+  }
+
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') {
+        showToast('Sensor ruxsati berilmadi. GPS ishlatiladi.');
+        return false;
+      }
+    } catch (error) {
+      showToast('Sensor ruxsati olishda xatolik. GPS ishlatiladi.');
+      return false;
+    }
+  }
+
+  state.sensorEnabled = true;
+  state.sensorPosition = { x: state.start.x, y: state.start.y };
+
+  // Device orientation (compass) for heading
+  if (orientationWatch !== undefined) window.removeEventListener('deviceorientation', handleOrientation);
+  window.addEventListener('deviceorientation', handleOrientation);
+
+  // Device motion (accelerometer) for movement detection
+  if (accelerationWatch !== undefined) window.removeEventListener('devicemotion', handleMotion);
+  window.addEventListener('devicemotion', handleMotion);
+
+  showToast('Sensor tracking yoqildi. Harakat qiling.');
+  return true;
+}
+
+function handleOrientation(event) {
+  if (event.alpha === null) return;
+  state.lastHeading = event.alpha; // 0-360 degrees
+}
+
+function handleMotion(event) {
+  if (!state.sensorEnabled || !state.sensorPosition) return;
+
+  const acc = event.accelerationIncludingGravity;
+  if (!acc) return;
+
+  // Calculate movement from acceleration
+  const ax = acc.x || 0;
+  const ay = acc.y || 0;
+  const az = acc.z || 0;
+
+  // Simple step detection: significant acceleration change
+  if (state.lastAcceleration) {
+    const dx = ax - state.lastAcceleration.x;
+    const dy = ay - state.lastAcceleration.y;
+    const dz = az - state.lastAcceleration.z;
+    const magnitude = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+    // If significant movement detected (> 2 m/s²)
+    if (magnitude > 2) {
+      // Move in direction of heading
+      const heading = state.lastHeading || 0;
+      const radians = (heading * Math.PI) / 180;
+      const stepSize = 1.5; // 1.5% per step on map
+
+      // Convert heading to map coordinates
+      const moveX = Math.sin(radians) * stepSize;
+      const moveY = -Math.cos(radians) * stepSize; // negative because y increases downward
+
+      state.sensorPosition.x = Math.max(0, Math.min(100, state.sensorPosition.x + moveX));
+      state.sensorPosition.y = Math.max(0, Math.min(100, state.sensorPosition.y + moveY));
+
+      // Update UI
+      $('#liveStartMarker').setAttribute('cx', state.sensorPosition.x);
+      $('#liveStartMarker').setAttribute('cy', state.sensorPosition.y);
+      $('#liveStartLabel').style.left = `${state.sensorPosition.x}%`;
+      $('#liveStartLabel').style.top = `${state.sensorPosition.y}%`;
+      $('#liveStartLabel').classList.remove('hidden');
+      $('#livePolyline').setAttribute('points', [state.sensorPosition, ...state.path, state.exit].map(pointString).join(' '));
+    }
+  }
+
+  state.lastAcceleration = { x: ax, y: ay, z: az };
+}
+
+function stopSensorTracking() {
+  state.sensorEnabled = false;
+  window.removeEventListener('deviceorientation', handleOrientation);
+  window.removeEventListener('devicemotion', handleMotion);
+}
+
+function updatePlanPositionFromGps(coords) {
+  // Time-based filtering: only update every 1 second minimum
+  const now = Date.now();
+  if (now - state.lastGpsUpdate < 1000 && state.smoothedPosition) return;
+  state.lastGpsUpdate = now;
+
+  // If we have a computed transform, use it for accurate projection
+  const projected = state.transform ? applyTransformToLatLon(coords.latitude, coords.longitude) : null;
+  if (projected) {
+    // Apply smoothing (exponential moving average)
+    if (!state.smoothedPosition) {
+      state.smoothedPosition = { x: projected.x, y: projected.y };
+    } else {
+      // Only update if movement is significant (> 1% on map)
+      const dx = Math.abs(projected.x - state.smoothedPosition.x);
+      const dy = Math.abs(projected.y - state.smoothedPosition.y);
+      if (dx < 1 && dy < 1) return; // Ignore small jitter
+      // Smooth with 0.5 factor (50% new, 50% old) for faster response
+      state.smoothedPosition.x = state.smoothedPosition.x * 0.5 + projected.x * 0.5;
+      state.smoothedPosition.y = state.smoothedPosition.y * 0.5 + projected.y * 0.5;
+    }
+    const current = state.smoothedPosition;
+    $('#liveStartMarker').setAttribute('cx', current.x);
+    $('#liveStartMarker').setAttribute('cy', current.y);
+    $('#liveStartLabel').style.left = `${current.x}%`;
+    $('#liveStartLabel').style.top = `${current.y}%`;
+    $('#liveStartLabel').classList.remove('hidden');
+    $('#livePolyline').setAttribute('points', [current, ...state.path, state.exit].map(pointString).join(' '));
+    return;
+  }
+  // fallback to original gpsAnchor heuristic
+  if (!state.start || !state.exit || !state.gpsAnchor) return;
   state.lastStableGps = { latitude: coords.latitude, longitude: coords.longitude };
   const latitudeMeters = (coords.latitude - state.gpsAnchor.latitude) * 111320;
   const longitudeMeters = (coords.longitude - state.gpsAnchor.longitude) * 111320 * Math.cos((state.gpsAnchor.latitude * Math.PI) / 180);
@@ -287,6 +574,7 @@ function updatePlanPositionFromGps(coords) {
   $('#liveStartMarker').setAttribute('cy', current.y);
   $('#liveStartLabel').style.left = `${current.x}%`;
   $('#liveStartLabel').style.top = `${current.y}%`;
+  $('#liveStartLabel').classList.remove('hidden');
   $('#livePolyline').setAttribute('points', [current, ...state.path, state.exit].map(pointString).join(' '));
 }
 
@@ -307,13 +595,11 @@ function findMe() {
     $('#liveStartLabel').style.top = `${state.start.y}%`;
     $('#liveStartLabel').classList.remove('hidden');
     $('#liveMap').classList.add('route-active');
-    showToast('GPS olindi. Rasm bilan tezkor kalibratsiya qilindi.');
-    startLocationWatch();
   }, () => showToast('GPS ruxsatini bering va qayta urinib ko‘ring'), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
 }
 
-function saveRoute() {
-  if (!state.start || !state.exit) return showToast('Avval “Siz” va “Chiqish” nuqtalarini belgilang');
+async function saveRoute() {
+  if (!state.start || !state.exit) return showToast('Avval "Siz" va "Chiqish" nuqtalarini belgilang');
   state.configured = true;
   $('#livePolyline').setAttribute('points', [state.start, ...state.path, state.exit].map(pointString).join(' '));
   $('#liveStartMarker').setAttribute('cx', state.start.x); $('#liveStartMarker').setAttribute('cy', state.start.y);
@@ -323,9 +609,13 @@ function saveRoute() {
   $('#liveStartLabel').classList.remove('hidden'); $('#liveExitLabel').classList.remove('hidden');
   state.gpsAnchor = null;
   state.lastStableGps = null;
+
+  // Use GPS tracking only (more reliable)
   startLocationWatch();
+
+  saveState();
   switchScreen('live');
-  showToast('Xarita moslandi. Sirena kuzatuvi tayyor.');
+  showToast('Xarita moslandi. GPS bilan kuzatuv tayyor.');
   startMonitoring();
 }
 
@@ -392,12 +682,12 @@ async function startMonitoring() {
     state.alarmActive = false;
     state.alarmHits = 0;
     state.noiseFloor = 0;
-    $('#monitorButton').disabled = true;
-    $('#monitorButton').textContent = 'Auto tinglash faol';
+    const _monitorBtn = $('#monitorButton');
+    if (_monitorBtn) { _monitorBtn.disabled = true; _monitorBtn.textContent = 'Auto tinglash faol'; }
     monitorTicks = 0;
     await prepareReferenceProfile();
     showToast(referenceProfile ? 'Mikrofon faol. Faqat yuklangan sirena taniladi.' : 'Sirena audiosi analiz qilinmadi. Audio faylni qayta yuklang.');
-    $('#monitorButton').textContent = '◉ Kuzatuv faol';
+    if (_monitorBtn) _monitorBtn.textContent = '◉ Kuzatuv faol';
     $('#liveStatus').textContent = 'Sirena kuzatilmoqda';
     monitorSound();
   } catch (error) { showToast('Mikrofon ruxsati berilmadi'); }
@@ -406,8 +696,8 @@ async function startMonitoring() {
 function stopMonitoring() {
   state.monitoring = false;
   state.alarmHits = 0;
-  $('#monitorButton').disabled = true;
-  $('#monitorButton').textContent = 'Auto tinglash yoqilgan';
+  const _monitorBtn2 = $('#monitorButton');
+  if (_monitorBtn2) { _monitorBtn2.disabled = true; _monitorBtn2.textContent = 'Auto tinglash yoqilgan'; }
   cancelAnimationFrame(monitorFrame);
   microphoneStream?.getTracks().forEach((track) => track.stop());
   microphoneStream = null;
@@ -417,7 +707,7 @@ function stopMonitoring() {
   referenceProfile = null;
   referenceSequence = [];
   liveSequence = [];
-  $('#monitorButton').textContent = '◉ Sirenani kuzatishni boshlash';
+  if (_monitorBtn2) _monitorBtn2.textContent = '◉ Sirenani kuzatishni boshlash';
 }
 
 function monitorSound() {
@@ -469,6 +759,8 @@ function loadDemoAssets() {
   updateMarkers();
   $('#saveRouteButton').textContent = 'Avtomatik tinglashni yoqish →';
   showToast('Chiqish joyi avtomatik belgilandi. Endi tugmani bosing.');
+  // In demo mode auto-apply the route so monitoring starts without pressing buttons
+  try { saveRoute(); } catch (e) { /* ignore if saveRoute not ready */ }
 }
 
 function installRouteButton() {
@@ -491,7 +783,7 @@ $$('.mode-tab').forEach((tab) => tab.addEventListener('click', () => setMode(tab
 $('#floorEditor').addEventListener('click', handleFloorClick);
 $('#mapInput').addEventListener('change', handleMapUpload);
 $('#audioInput').addEventListener('change', handleAudioUpload);
-$('#getLocationButton').addEventListener('click', getLocation);
+$('#addAnchorButton')?.addEventListener('click', () => { state.mode = 'anchor'; showToast('Rasmda hozir turgan joyingizni bosing, so\'ng GPS olinadi'); });
 $('#findMeButton').addEventListener('click', findMe);
 $('#saveRouteButton').addEventListener('click', saveRoute);
 $('#testAlarmButton').addEventListener('click', triggerAlarm);
@@ -501,6 +793,10 @@ $('#editRouteButton').addEventListener('click', () => { switchScreen('calibratio
 $('#backToSetup').addEventListener('click', () => switchScreen('setup'));
 window.addEventListener('beforeunload', stopMonitoring);
 window.addEventListener('beforeunload', stopLocationWatch);
-$('#monitorButton').disabled = true;
-$('#monitorButton').textContent = 'Auto tinglash yoqilgan';
+window.addEventListener('beforeunload', stopSensorTracking);
+const __monitorBtnInit = $('#monitorButton');
+if (__monitorBtnInit) { __monitorBtnInit.disabled = true; __monitorBtnInit.textContent = 'Auto tinglash yoqilgan'; }
+renderAnchors();
 loadDemoAssets();
+// Load saved state from localStorage
+loadState();
